@@ -12,11 +12,549 @@
       "version": {
         "major": 0,
         "minor": 0,
-        "level": "alpha",
+        "level": "beta",
         "patch": 0
       }
-    }
+    },
+    "software": {
+      "display": {
+        "title": "Backup System",
+        "label": "backup"
+      }
+    },
+    "timestamp": "2017-11-15T18:57:14+11:00"
   },
   "software": {
+    "base": {
+      "name": "backup",
+      "accepts": [
+        "ManagedEngine",
+        "ManagedService",
+        "filesystem/local/filesystem",
+        "database/sql/mysql",
+        "database/sql/pgsql",
+        "database/nosql/mongo"
+      ],
+      "publisher_namespace": "EnginesSystem",
+      "type_path": "backup",
+      "service_handle_field": "backup_name",
+      "parent_image": "engines/servicebase",
+      "run_as_user": "backup",
+      "deployment_type": "worker",
+      "memory": {
+        "required": 256,
+        "recommended": 254
+      },
+      "attach_post_build": true
+    },
+    "scripts": {
+      "start": {
+        "language": "sh",
+        "content": "#!/bin/sh\r\n\r\nPID_FILE=/var/run/fcron.pid\r\nexport PID_FILE\r\n. /home/engines/functions/trap.sh\r\n\r\n\r\n/home/backup/fcron/sbin/fcron -f &\r\necho $! > /var/run/fcron.pid\r\n/home/backup/fcron/bin/fcrontab -u backup  -z \r\n\r\nstartup_complete\r\n\r\nif test -d home/backup/.cache/duplicity/\r\n then\r\n\trm `find  /home/backup/.cache/duplicity/ -name lockfile.lock`\r\nfi\r\nwait \r\nexit_code=$?\r\n\r\nshutdown_complete \r\n"
+      }
+    },
+    "system_packages": [
+      {
+        "package": "mysql-client"
+      },
+      {
+        "package": "lftp"
+      },
+      {
+        "package": "python"
+      },
+      {
+        "package": "duply"
+      },
+      {
+        "package": "python-boto"
+      },
+      {
+        "package": "ncftp"
+      },
+      {
+        "package": "python-paramiko"
+      },
+      {
+        "package": "python-gobject-2"
+      },
+      {
+        "package": "build-essential"
+      },
+      {
+        "package": "gcc"
+      },
+      {
+        "package": "make"
+      }
+    ],
+    "installed_packages": [
+      {
+        "name": "fcron-3.3.0.src.tar.gz",
+        "destination": "src",
+        "extraction_command": "tar -xzpf fcron-3.3.0.src.tar.gz",
+        "path_to_extracted": "fcron-3.3.0"
+      }
+    ],
+    "consumer_params": [
+      {
+        "name": "src_type",
+        "value": "engine",
+        "input": {
+          "type": "hidden"
+        }
+      },
+      {
+        "name": "sources",
+        "value": " _Engines_Builder(engine_persistent_services)",
+        "mandatory": true,
+        "input": {
+          "type": "hidden"
+        }
+      },
+      {
+        "name": "email",
+        "ask_at_build_time": true,
+        "input": {
+          "type": "email",
+          "label": "email",
+          "title": "Notification email",
+          "validation": {
+            "pattern": ".[@].*",
+            "message": "Please enter a valid email address   "
+          }
+        }
+      },
+      {
+        "name": "dest_proto",
+        "mandatory": true,
+        "ask_at_build_time": true,
+        "input": {
+          "type": "select",
+          "label": "dest_proto",
+          "title": "Destination Protocol",
+          "collection": {
+            "include_blank": true,
+            "items": {
+              "ftp": "ftp",
+              "local": "local",
+              "smbfs": "smbfs",
+              "s3": "s3"
+            }
+          }
+        }
+      },
+      {
+        "name": "dest_user",
+        "input": {
+          "type": "string",
+          "label": "dest_user",
+          "title": "Destination username"
+        }
+      },
+      {
+        "name": "dest_pass",
+        "mandatory": true,
+        "input": {
+          "type": "password",
+          "label": "password",
+          "title": "Destination password",
+          "validation": {
+            "pattern": ".*",
+            "message": "Please enter password"
+          }
+        }
+      },
+      {
+        "name": "dest_address",
+        "mandatory": true,
+        "ask_at_build_time": true,
+        "input": {
+          "type": "string",
+          "title": "Destination address ",
+          "comment": "FQDN or ip address"
+        }
+      },
+      {
+        "name": "dest_folder",
+        "mandatory": true,
+        "ask_at_build_time": true,
+        "input": {
+          "type": "string",
+          "label": "dest_folder",
+          "title": "Destination Folder"
+        }
+      },
+      {
+        "name": "backup_name",
+        "mandatory": true,
+        "immutable": true,
+        "ask_at_build_time": true,
+        "input": {
+          "type": "string",
+          "title": "Backup Name",
+          "comment": "Unique for distination/folder"
+        }
+      },
+      {
+        "name": "backup_type",
+        "mandatory": true,
+        "immutable": true,
+        "ask_at_build_time": true,
+        "input": {
+          "type": "select",
+          "label": "backup_type",
+          "title": "Backup Type",
+          "collection": {
+            "items": {
+              "full": "Full",
+              "incre": "Incremental"
+            }
+          }
+        }
+      }
+    ],
+    "actionators": [
+      {
+        "name": "download_public_key",
+        "label": "Dowload public key",
+        "return_type": "file",
+        "return_file_name": "backup_key.pub",
+        "script": {
+          "language": "sh",
+          "content": "#!/bin/bash\r\n\r\nif test -f /home/backup/.gnupg/key_created\r\nthen\r\n gpg --export -a `cat /home/backup/.gnupg/key_id`\r\nelse\r\n echo \"Failed:Key not set\"\r\nfi"
+        }
+      },
+      {
+        "name": "download_private_key",
+        "label": "Download private key",
+        "return_type": "file",
+        "return_file_name": "backup_key.priv",
+        "enable_logging": true,
+        "script": {
+          "language": "sh",
+          "content": "#!/bin/bash\r\n\r\nif test -f /home/backup/.gnupg/key_created\r\nthen\r\n gpg --export-secret-key -a `cat /home/backup/.gnupg/key_id`\r\nelse\r\n echo \"Failed:Key not set\"\r\nfi\r\n\t\r\n\t  "
+        }
+      },
+      {
+        "name": "show_backup_password",
+        "label": "Show Backup Password",
+        "return_type": "json",
+        "enable_logging": true,
+        "script": {
+          "language": "sh",
+          "content": "#!/bin/sh\r\npass=`cat /home/backup/.gnupg/pass`\r\necho '{\"backup_password\":\"'$pass'\"}'"
+        }
+      },
+      {
+        "name": "restore",
+        "label": "Restore",
+        "return_type": "plain_text",
+        "enable_logging": true,
+        "variables": [
+          {
+            "name": "type",
+            "mandatory": true,
+            "input": {
+              "type": "select",
+              "label": "Restore type ",
+              "collection": {
+                "items": {
+                  "all": "All",
+                  "system": "System",
+                  "registry": "Registry",
+                  "service": "Service",
+                  "app": "Application",
+                  "volume": "Volume"
+                }
+              }
+            }
+          },
+          {
+            "name": "before",
+            "input": {
+              "type": "date",
+              "label": "Before Date"
+            }
+          },
+          {
+            "name": "source",
+            "input": {
+              "type": "string",
+              "label": "Source",
+              "hint": "service | app name"
+            }
+          },
+          {
+            "name": "section",
+            "input": {
+              "type": "string",
+              "label": "Section",
+              "hint": "Restore just a dir or db or .. or table "
+            }
+          }
+        ],
+        "script": {
+          "language": "sh",
+          "content": "#!/bin/bash\r\n\r\n. /home/engines/functions/params_to_env.sh\r\nparams_to_env\r\n\r\nif test -z $section \r\n then\r\n  section=''\r\nelif test \"$section\" = all\r\n then\r\n  section=''\r\n fi  \r\n \r\nif test -z $replace\r\n then\r\n  replace=replace #replace|rename|missing\r\nfi\r\nexport replace section source\r\n\r\n\r\nCURL_OPTS=\"-k -X PUT --header \"Content-Type:application/octet-stream\" --data-binary  @-\"\r\n\r\nfunction restore_system {\r\necho \"Restoring system $replace $source $section $from_date\"\r\n/home/engines/scripts/engine/run_duply.sh system restore /tmp/system/ $from_date\r\n\r\nsudo -n -E /home/engines/scripts/restore/_restore_system.sh\r\n\r\n#cat /tmp/system/db*gz |curl $CURL_OPTS https://172.17.0.1:2380/v0/restore/system/db\r\n#sudo -n /home/engines/scripts/restore/_clr_restore.sh system\r\n}\r\n\r\nfunction restore_registry {\r\n/home/engines/scripts/engine/run_duply.sh registry restore /tmp/registry $from_date\r\nsudo -n -E /home/engines/scripts/restore/_restore_registry.sh\r\n}\r\n\r\nfunction restore_logs {\r\n\r\nif ! test -z $section\r\n then\r\n   path=$path/$section\r\nfi\r\n\r\nif test -z $path\r\n then\r\n  /home/engines/scripts/engine/run_duply.sh logs restore /tmp/logs $from_date\r\n   echo \"Restoring full logs $replace\"\r\n  sudo -n -E /home/engines/scripts/restore/_restore.sh $replace logs\r\n  sudo -n /home/engines/scripts/restore/_clr_restore.sh logs\r\nelse\r\n /home/engines/scripts/engine/run_duply.sh logs fetch $path /tmp/logs \r\n  echo \"Restoring logs $path $replace\"\r\n  sudo -n -E /home/engines/scripts/restore/_restore.sh $replace logs\r\n  sudo -n /home/engines/scripts/restore/_clr_restore.sh logs\r\nfi\r\n}\r\n\r\nfunction volume_restore {\r\n\r\n\r\npath=$source\r\nif ! test -z $section\r\n then\r\n  path=$path/$section\r\nfi\r\n\r\nif test -z $path\r\n then\r\n echo \"Restoring engines_fs full $replace\"\r\n /home/engines/scripts/engine/run_duply.sh engines_fs restore /tmp/volumes/fs/ $from_date\r\nelse\r\n echo \"Restoring engines_fs $path\"\r\n /home/engines/scripts/engine/run_duply.sh engines_fs fetch $path /tmp/volumes/fs/$path $from_date\r\nfi\r\n  \r\n sudo -n -E /home/engines/scripts/restore/_restore.sh $replace volumes/fs\r\n sudo -n /home/engines/scripts/restore/_clr_restore.sh volumes\r\n  \r\n}\r\n\r\nfunction service_restore {\r\necho \"Restoring $service $replace $section\"\r\n/home/engines/scripts/engine/run_duply.sh $service restore /tmp/$service $from_date\r\n \r\n\r\nsudo -n /home/engines/scripts/restore/_bundle_restore.sh $service |curl $CURL_OPTS https://172.17.0.1:2380/v0/restore/service/$service/$replace/$section \r\nsudo -n /home/engines/scripts/restore/_clr_restore.sh $service\r\n}\r\n\r\nfunction restore_engines {\r\n\r\n curl $CURL_OPTS https://172.17.0.1:2380/v0/restore/engines\r\n}\r\n\r\nfunction restore_services {\r\nfor service in syslog mongod mysqld pgsqld auth certs email imap \r\n do\r\n   service_restore\r\ndone\r\n}\r\n\r\nfunction restore_engine_services {\r\necho \"\"\r\n}\r\n\r\necho  $type > /home/engines/run/flags/restore\r\n\r\nif test $type = full\r\n then\r\n  restore_logs\r\n  volume_restore\r\n  restore_system  \r\n  restore_services\r\n  restore_registry \r\n  restore_engines \r\nelif test $type = system\r\n then\r\n  restore_system \r\nelif test $type = registry\r\n then\r\n  restore_registry \r\nelif test $type = logs\r\n then\r\n  restore_logs\r\nelif test $type = volume \r\n then\r\n  volume_restore\r\nelif test $type = service\r\n then\r\n   if test -z $source\r\n\tthen\r\n\t restore_services\r\n    else\r\n     service=$source\r\n     service_restore\r\n    fi\r\nelif test $type = engine\r\n then\r\n  if test -z $source\r\n   then\r\n    echo \"missing engine name\"\r\n    exit 127\r\n   fi\r\n  restore_system  \r\n  volume_restore\r\n  restore_engine_services\r\n  restore_engine\r\nelse\r\n echo \"Unknown Restore Type\"\r\n exit 127   \r\nfi\r\n\r\nrm /home/engines/run/flags/restore\r\nexit 0\r\n"
+        }
+      },
+      {
+        "name": "set_backup_credentials",
+        "label": "Credentials for Restore",
+        "return_type": "plain_text",
+        "enable_logging": true,
+        "variables": [
+          {
+            "name": "backup_password",
+            "mandatory": true,
+            "input": {
+              "type": "password_with_confirmation",
+              "title": "Password"
+            }
+          },
+          {
+            "name": "pub_key",
+            "mandatory": true,
+            "input": {
+              "type": "text",
+              "title": "Public Key"
+            }
+          },
+          {
+            "name": "priv_key",
+            "mandatory": true,
+            "input": {
+              "type": "text",
+              "title": "Private Key"
+            }
+          }
+        ],
+        "script": {
+          "language": "sh",
+          "content": "#!/bin/bash\r\n\r\n. /home/engines/functions/params_to_env.sh\r\nparams_to_env\r\n\r\nsudo -n /home/engines/scripts/actionators/_fix_perms.sh\r\n\r\nrequired_values=\"pub_key priv_key backup_password\"\r\ncheck_required_values\r\n\r\n\r\necho $priv_key |  sed \"/\\\\\\r/s///g\" | sed \"/\\\\\\n/s//\\n/g\" >/tmp/.tt\r\nres=` cat /tmp/.tt | gpg --allow-secret-key-import --import - 2>&1`\r\n\r\n\r\nif test $? -ne 0\r\n then\r\n  echo Error with import $res\r\n  rm /tmp/.tt\r\n  exit 127\r\n  fi \r\n  \r\nrm /tmp/.tt\r\n  \r\nkey_id=`echo $res \\\r\n       | grep \"secret key imported\"\\\r\n       | awk '{print $3}' | sed \"/:/s///\"`\r\n  \r\nif test -z $key_id\r\n then\r\n  echo $priv_key |\\\r\n  sed \"/\\\\\\r/s///g\" | sed \"/\\\\\\n/s//\\n/g\"  >/tmp/p\r\n  echo import failed $res\r\n  exit 127\r\nfi\r\n\r\necho $key_id > /home/backup/.gnupg/key_id\r\necho $backup_password > /home/backup/.gnupg/pass_${key_id}\r\necho $backup_password > /home/backup/.gnupg/pass\r\n\r\n/home/engines/scripts/actionators/trust_key.expect $key_id \r\n\r\necho \"OK\"\r\nexit 0\r\n\t  "
+        }
+      },
+      {
+        "name": "set_key_id",
+        "label": "Set key id",
+        "return_type": "plain_text",
+        "enable_logging": true,
+        "variables": [
+          {
+            "name": "disabled",
+            "input": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "key_id",
+            "input": {
+              "type": "string",
+              "title": "Key ID"
+            }
+          }
+        ],
+        "script": {
+          "language": "sh",
+          "content": "#!/bin/bash\r\n\r\n. /home/engines/functions/params_to_env.sh\r\nparams_to_env\r\n\r\nif ! test -z $disabled \r\n then\r\n   if  test $disabled = yes\r\n    then\r\n    \trm /home/backup/.gnupg/key_id\r\n    \techo 'OK'\r\n    \texit 0\r\n    fi\r\nfi\r\nrequired_values=\"key_id\"\r\ncheck_required_values\r\n \r\n if ! test -f /home/backup/.gnupg/pass_${key_id}\r\n  then\r\n   echo \"missing saved password\"\r\n \texit 255\r\n fi\r\n \r\n echo ${key_id} > /home/backup/.gnupg/key_id\r\nexit 0  "
+        }
+      },
+      {
+        "name": "run_backup",
+        "label": "Run Backup",
+        "return_type": "plain_text",
+        "enable_logging": true,
+        "variables": [
+          {
+            "name": "backup_name",
+            "input": {
+              "type": "string",
+              "label": "Leave blank for complete",
+              "title": "Back Up Name"
+            }
+          }
+        ],
+        "script": {
+          "language": "sh",
+          "content": "#!/bin/bash\r\n\r\n. /home/engines/functions/params_to_env.sh\r\nparams_to_env\r\n\r\ncd /home/backup\r\nif test -z $backup_name\r\n then\r\n   /home/engines/scripts/engine/run_duply.sh\r\nelse\r\n  /home/engines/scripts/engine/run_duply.sh $backup_name backup\r\nfi\r\n"
+        }
+      },
+      {
+        "name": "list_backups",
+        "label": "List Backups",
+        "return_type": "json",
+        "enable_logging": true,
+        "script": {
+          "language": "sh",
+          "content": "#!/bin/bash\r\ncd  /home/backup/.duply/\r\nbackups=`find . -type d |grep / |sed \"/\\.\\//s///\"`\r\n\r\necho -n '{\"backups\":['\r\nn=0\r\nif ! test -z \"$backups\"\r\n then  \r\nfor backup in $backups\r\ndo\r\n if test $n == 0\r\n  then \r\n   n=2\r\n else\r\n   echo -n ','\r\n fi\r\n echo -n '\"'$backup'\"'\r\ndone\r\nfi\r\necho ']}'"
+        }
+      },
+      {
+        "name": "status",
+        "label": "Status",
+        "return_type": "json",
+        "script": {
+          "language": "sh",
+          "content": "#!/bin/bash\r\n\r\necho -n '{\"backup_running\":'\r\n\r\nif test -f /home/engines/run/flags/backup_run\r\n then \r\n  echo -n '\"yes\"'\r\n else\r\n   echo -n '\"no\"'\r\nfi\r\n\r\necho -n ',\"restore_running\":' \r\n\r\nif test -f /home/engines/run/flags/restore\r\n then \r\n  echo -n '\"yes\"'\r\n else\r\n   echo -n '\"no\"'\r\nfi\r\nif test -f /home/engines/run/flags/current_backup\r\n then\r\ncurrent_backup=`cat /home/engines/run/flags/current_backup`\r\nif test -z current_backup\r\n then \r\n  current_backup=none\r\nfi\r\nfi\r\nif test -f /home/engines/run/flags/current_operation\r\n then\r\ncurrent_operation=`cat /home/engines/run/flags/current_operation`\r\nif test -z current_operation\r\n then \r\n  current_operation=none\r\nfi\r\nfi\r\n\r\necho -n ',\"current_backup\":\"'$current_backup\r\necho -n '\",\"current_operation\":\"'$current_operation\r\necho -n '\"}'\r\n\r\n"
+        }
+      },
+      {
+        "name": "backup_logs",
+        "label": "Backup logs",
+        "return_type": "json",
+        "variables": [
+          {
+            "name": "backup_name ",
+            "input": {
+              "type": "string",
+              "label": "Backup Name",
+              "comment": "name from backup list"
+            }
+          },
+          {
+            "name": "date",
+            "input": {
+              "type": "date",
+              "title": "Date"
+            }
+          }
+        ],
+        "script": {
+          "language": "sh",
+          "content": "#!/bin/bash\r\n\r\n\r\n. /home/engines/functions/params_to_env.sh\r\nparams_to_env\r\n\r\ncd /var/log/\r\nn=0\r\nif test -z $backup_name  \r\n then\r\n  echo -n '{\"backup_logs\":['\r\nfi\r\nif test -z $date  \r\n then\r\n   echo -n '{\"backup_logs\":['\r\nfi\r\n\r\nfor log_file in ` ls *_*`\r\ndo\r\n\r\nif ! test -z $backup_name \r\n then\r\n log_file=`echo $log_file |grep $backup_name`\r\n  if test -z  $log_file\r\n   then\r\n    continue\r\n  fi \r\nfi\r\n\r\nif ! test -z $date \r\n then\r\n log_file=`echo $log_file |grep $date`\r\n   if test -z  $log_file\r\n   then\r\n    continue\r\n  fi \r\nif ! test -z $backup_name \r\n then \r\n echo -n '{\"backup_name\":\"'$backup_name'\",\"date\":\"'$date'\",\"contents\":\"'\r\n cp $log_file /tmp/log\r\n echo -n '\"}' >> /tmp/log\r\n cat /tmp/log | sed ':a;$!{N;s/\\n/\\\\r\\\\n/;ba;}'\r\n rm /tmp/log\r\n exit 0\r\nfi\r\nfi\r\n\r\n\r\n\r\nname=`echo $log_file | sed \"/_[0-9][0-9]_.*.log/s///\"`\r\nlog_date=`echo $log_file | sed \"/[_a-z]*_/s///\" | sed \"/.log/s///\"`\r\nif test $n -ne 0\r\nthen\r\n echo -n \",\"\r\nfi\r\nn=1\r\necho -n '{\"name\":\"'$name'\",\"date\":\"'$log_date'\"}'\r\n\r\ndone\r\n echo ']}'\r\n "
+        }
+      }
+    ],
+    "configurators": [
+      {
+        "name": "backup_notification_email",
+        "description": "Backup notification email ",
+        "enable_logging": true,
+        "variables": [
+          {
+            "name": "backup_email",
+            "input": {
+              "type": "email",
+              "label": "backup_email ",
+              "title": "Ntoifcation Email"
+            }
+          }
+        ],
+        "set_script": {
+          "language": "sh",
+          "content": "#!/bin/bash\r\n\r\n. /home/engines/functions/params_to_env.sh\r\nPARAMS_FILE=/home/engines/scripts/configurators/saved/backup_email_hash\r\nparms_to_file_and_env\r\n\r\n\r\n\r\necho -n $backup_email >/home/engines/scripts/configurators/saved/backup_email\r\n\r\nif ! test -f /home/backup/.gnupg/key_created\r\n then\r\n   /home/engines/scripts/configurators/init_gpg_key.sh\r\nfi\r\n\r\nexit 0"
+        },
+        "read_script": {
+          "language": "sh",
+          "content": "#!/bin/sh\r\n\r\nif test -f /home/engines/scripts/configurators/saved/system_backup\r\n then\r\n  cat /home/engines/scripts/configurators/saved/system_backup\r\nelse\r\n  echo '{\"system_backup\":\"Not Set\"}'\r\nfi\r\n\r\nexit 0"
+        }
+      },
+      {
+        "name": "system_backup",
+        "label": "System Backup setup",
+        "enable_logging": true,
+        "variables": [
+          {
+            "name": "include_logs",
+            "value": "true",
+            "input": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "include_files",
+            "value": "true",
+            "input": {
+              "type": "boolean",
+              "title": "Include files"
+            }
+          },
+          {
+            "name": "include_services",
+            "value": "true",
+            "input": {
+              "type": "boolean",
+              "title": "Backup services"
+            }
+          },
+          {
+            "name": "include_system",
+            "value": "true",
+            "input": {
+              "type": "boolean",
+              "title": "Include system"
+            }
+          },
+          {
+            "name": "frequency",
+            "input": {
+              "type": "select",
+              "label": "Backup Frequency",
+              "collection": {
+                "items": {
+                  "nightly": "Nightly",
+                  "weekly": "monthly"
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "default_destination",
+        "label": "Default Backup settings",
+        "enable_logging": true,
+        "variables": [
+          {
+            "name": "dest_pass",
+            "input": {
+              "type": "password_with_confirmation",
+              "label": "Destination password"
+            }
+          },
+          {
+            "name": "dest_proto",
+            "mandatory": true,
+            "input": {
+              "type": "select",
+              "title": "Backup destination type ",
+              "collection": {
+                "items": {
+                  "ftp": "ftp",
+                  "local": "local",
+                  "s3": "AWS S3 bucket",
+                  "smbfs": "smbfs"
+                }
+              }
+            }
+          },
+          {
+            "name": "dest_address",
+            "mandatory": true,
+            "input": {
+              "type": "string",
+              "label": "Destinaton address fqdn | ip address"
+            }
+          },
+          {
+            "name": "dest_user",
+            "mandatory": true,
+            "input": {
+              "type": "string",
+              "label": "Destination username"
+            }
+          },
+          {
+            "name": "dest_folder",
+            "mandatory": true,
+            "input": {
+              "type": "string",
+              "title": "Destination folder"
+            }
+          }
+        ]
+      }
+    ]
   }
 }
