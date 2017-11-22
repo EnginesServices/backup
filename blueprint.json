@@ -22,7 +22,7 @@
         "label": "backup"
       }
     },
-    "timestamp": "2017-11-15T18:57:14+11:00"
+    "timestamp": "2017-11-22T14:19:37+11:00"
   },
   "software": {
     "base": {
@@ -106,7 +106,7 @@
       },
       {
         "name": "sources",
-        "value": " _Engines_Builder(engine_persistent_services)",
+        "value": "_Engines_Builder(engine_persistent_services)",
         "mandatory": true,
         "input": {
           "type": "hidden"
@@ -434,10 +434,11 @@
         "variables": [
           {
             "name": "backup_email",
+            "mandatory": true,
             "input": {
               "type": "email",
               "label": "backup_email ",
-              "title": "Ntoifcation Email"
+              "title": "Notifcation email"
             }
           }
         ],
