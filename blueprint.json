@@ -2,8 +2,8 @@
   "schema": {
     "type": "service_blueprint",
     "version": {
-      "major": 1,
-      "minor": 0
+      "major": 0,
+      "minor": 1
     },
     "origin": "Engines Developer Studio 0.2"
   },
@@ -22,29 +22,25 @@
         "label": "backup"
       }
     },
-    "timestamp": "2017-11-22T14:19:37+11:00"
+    "timestamp": "2019-02-14T11:48:41+11:00"
   },
   "software": {
     "base": {
       "name": "backup",
-      "accepts": [
-        "ManagedEngine",
-        "ManagedService",
-        "filesystem/local/filesystem",
-        "database/sql/mysql",
-        "database/sql/pgsql",
-        "database/nosql/mongo"
-      ],
       "publisher_namespace": "EnginesSystem",
       "type_path": "backup",
       "service_handle_field": "backup_name",
       "parent_image": "engines/servicebase",
-      "run_as_user": "backup",
       "deployment_type": "worker",
+      "default_stop_timeout": 0,
+      "restart_attempts": 0,
       "memory": {
         "required": 256,
         "recommended": 254
       },
+      "run_as_user": "backup"
+    },
+    "disposition": {
       "attach_post_build": true
     },
     "scripts": {
@@ -96,6 +92,16 @@
         "path_to_extracted": "fcron-3.3.0"
       }
     ],
+    "consumers": {
+      "accepts": [
+        "ManagedEngine",
+        "ManagedService",
+        "filesystem/local/filesystem",
+        "database/sql/mysql",
+        "database/sql/pgsql",
+        "database/nosql/mongo"
+      ]
+    },
     "consumer_params": [
       {
         "name": "src_type",
@@ -120,7 +126,6 @@
           "label": "email",
           "title": "Notification email",
           "validation": {
-            "pattern": ".[@].*",
             "message": "Please enter a valid email address   "
           }
         }
