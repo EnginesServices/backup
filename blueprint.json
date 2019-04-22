@@ -22,7 +22,7 @@
         "label": "backup"
       }
     },
-    "timestamp": "2019-03-03T10:42:04+11:00"
+    "timestamp": "2019-04-23T07:48:02+10:00"
   },
   "software": {
     "base": {
@@ -86,7 +86,8 @@
     ],
     "installed_packages": [
       {
-        "name": "fcron-3.3.0.src.tar.gz",
+        "name": "fcron3",
+        "download_type": "http(s)",
         "destination": "src",
         "extraction_command": "tar -xzpf fcron-3.3.0.src.tar.gz",
         "path_to_extracted": "fcron-3.3.0"
@@ -410,7 +411,7 @@
         "return_type": "json",
         "variables": [
           {
-            "name": "backup_name ",
+            "name": "backup_name",
             "input": {
               "type": "string",
               "label": "Backup Name",
@@ -429,6 +430,53 @@
           "language": "sh",
           "content": "#!/bin/bash\r\n\r\n\r\n. /home/engines/functions/params_to_env.sh\r\nparams_to_env\r\n\r\ncd /var/log/\r\nn=0\r\nif test -z $backup_name  \r\n then\r\n  echo -n '{\"backup_logs\":['\r\nfi\r\nif test -z $date  \r\n then\r\n   echo -n '{\"backup_logs\":['\r\nfi\r\n\r\nfor log_file in ` ls *_*`\r\ndo\r\n\r\nif ! test -z $backup_name \r\n then\r\n log_file=`echo $log_file |grep $backup_name`\r\n  if test -z  $log_file\r\n   then\r\n    continue\r\n  fi \r\nfi\r\n\r\nif ! test -z $date \r\n then\r\n log_file=`echo $log_file |grep $date`\r\n   if test -z  $log_file\r\n   then\r\n    continue\r\n  fi \r\nif ! test -z $backup_name \r\n then \r\n echo -n '{\"backup_name\":\"'$backup_name'\",\"date\":\"'$date'\",\"contents\":\"'\r\n cp $log_file /tmp/log\r\n echo -n '\"}' >> /tmp/log\r\n cat /tmp/log | sed ':a;$!{N;s/\\n/\\\\r\\\\n/;ba;}'\r\n rm /tmp/log\r\n exit 0\r\nfi\r\nfi\r\n\r\n\r\n\r\nname=`echo $log_file | sed \"/_[0-9][0-9]_.*.log/s///\"`\r\nlog_date=`echo $log_file | sed \"/[_a-z]*_/s///\" | sed \"/.log/s///\"`\r\nif test $n -ne 0\r\nthen\r\n echo -n \",\"\r\nfi\r\nn=1\r\necho -n '{\"name\":\"'$name'\",\"date\":\"'$log_date'\"}'\r\n\r\ndone\r\n echo ']}'\r\n "
         }
+      },
+      {
+        "name": "rm_backup_ssh_key",
+        "return_type": "plain_text"
+      },
+      {
+        "name": "list_backup_ssh_keys",
+        "return_type": "plain_text"
+      },
+      {
+        "name": "upload_ssh_key",
+        "return_type": "plain_text",
+        "variables": [
+          {
+            "name": "host",
+            "input": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "private",
+            "mandatory": true,
+            "input": {
+              "type": "text"
+            }
+          },
+          {
+            "name": "public",
+            "mandatory": true,
+            "input": {
+              "type": "text"
+            }
+          }
+        ]
+      },
+      {
+        "name": "generate_ssh_key",
+        "return_type": "plain_text",
+        "variables": [
+          {
+            "name": "host",
+            "mandatory": true,
+            "input": {
+              "type": "string"
+            }
+          }
+        ]
       }
     ],
     "configurators": [
