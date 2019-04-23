@@ -22,7 +22,7 @@
         "label": "backup"
       }
     },
-    "timestamp": "2019-04-23T09:00:07+10:00"
+    "timestamp": "2019-04-23T09:24:00+10:00"
   },
   "software": {
     "base": {
@@ -583,7 +583,8 @@
                   "ftp": "ftp",
                   "local": "local",
                   "s3": "AWS S3 bucket",
-                  "smbfs": "smbfs"
+                  "smbfs": "smbfs",
+                  "sftp": "sftp"
                 }
               }
             }
