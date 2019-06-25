@@ -22,7 +22,7 @@
         "label": "backup"
       }
     },
-    "timestamp": "2019-06-25T15:36:08+10:00"
+    "timestamp": "2019-06-25T16:59:18+10:00"
   },
   "software": {
     "base": {
@@ -217,6 +217,12 @@
               "incre": "Incremental"
             }
           }
+        }
+      },
+      {
+        "name": "key_name",
+        "input": {
+          "type": "string"
         }
       }
     ],
@@ -619,6 +625,12 @@
             "input": {
               "type": "string",
               "title": "Destination folder"
+            }
+          },
+          {
+            "name": "key_name",
+            "input": {
+              "type": "string"
             }
           }
         ]
