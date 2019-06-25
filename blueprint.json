@@ -22,7 +22,7 @@
         "label": "backup"
       }
     },
-    "timestamp": "2019-04-23T09:24:00+10:00"
+    "timestamp": "2019-06-25T14:49:15+10:00"
   },
   "software": {
     "base": {
@@ -393,7 +393,7 @@
         "enable_logging": true,
         "script": {
           "language": "sh",
-          "content": "#!/bin/bash\r\ncd  /home/backup/.duply/\r\nbackups=`find . -type d |grep / |sed \"/\\.\\//s///\"`\r\n\r\necho -n '{\"backups\":['\r\nn=0\r\nif ! test -z \"$backups\"\r\n then  \r\nfor backup in $backups\r\ndo\r\n if test $n == 0\r\n  then \r\n   n=2\r\n else\r\n   echo -n ','\r\n fi\r\n echo -n '\"'$backup'\"'\r\ndone\r\nfi\r\necho ']}'"
+          "content": "#!/bin/sh\r\ncd  /home/backup/.duply/\r\nbackups=`find . -type d |grep / |sed \"/\\.\\//s///\"`\r\n\r\necho -n '{\"backups\":['\r\nn=0\r\nif ! test -z \"$backups\"\r\n then  \r\nfor backup in $backups\r\ndo\r\n if test $n == 0\r\n  then \r\n   n=2\r\n else\r\n   echo -n ','\r\n fi\r\n echo -n '\"'$backup'\"'\r\ndone\r\nfi\r\necho ']}'"
         }
       },
       {
@@ -480,7 +480,16 @@
       },
       {
         "name": "view_ssh_key",
-        "return_type": "plain_text"
+        "return_type": "plain_text",
+        "variables": [
+          {
+            "name": "key_host",
+            "mandatory": true,
+            "input": {
+              "type": "string"
+            }
+          }
+        ]
       }
     ],
     "configurators": [
